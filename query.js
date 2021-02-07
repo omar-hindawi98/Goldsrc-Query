@@ -149,7 +149,7 @@ Query.prototype._handle_server_info = function(data){
     this.server_info.vac = data.readByte();
     this.server_info.bots = data.readByte();
 
-    this.emit("server_info", this.server_info);
+    this.emit("info", this.server_info);
 }
 
 Query.prototype._handle_players = function(data){
@@ -167,7 +167,7 @@ Query.prototype._handle_players = function(data){
         });
     }
 
-    this.emit("players_info", this.players_info);
+    this.emit("players", this.players_info);
 };
 
 Query.prototype._handle_rules = function(data){

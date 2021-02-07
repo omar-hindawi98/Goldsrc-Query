@@ -8,7 +8,41 @@ const Query = require('./query');
 ```
 
 ## Functions
+Functions that are available in the library.
+```javascript
+const query = new Query(address, port, VERBOSE);
 
+// Connection
+query.connect(); // Starts the socket
+query.close(); // Closes the socket
+
+// Change Verbose
+query.set_verbose(value);
+
+// Query functions
+query.query_challenge(); // Gets the challenge for player & rules query
+query.query_players(); // Gets the players
+query.query_rules(); // Gets the rules
+query.query_server_info(); // Gets the server info
+query.query_ping(); // Pings the server, returns latency
+```
+
+## Events
+Events emitted by the query tool.
+```javascript
+// Socket
+query.on("error", (err) => {});
+query.on("listening", () => {});
+query.on("close", () => {});
+
+// Response
+query.on("challenge", (challenge) => {});
+query.on("info", (data) => {});
+query.on("players", (data) => {});
+query.on("rules", (data) => {});
+query.on("ping", (latency) => {});
+query.on("error", (err) => {}); // If challenge is not set
+```
 
 ## Examples
 Examples can be found under the folder /example.
