@@ -1,6 +1,6 @@
 const Query = require('./../query')
 
-const query = new Query("91.225.104.199", 27015);
+const query = new Query("46.239.101.132", 27015);
 
 // Connect
 query.connect();
@@ -13,17 +13,19 @@ query.check_connection().then((latency) => {
     query.on("info", (data) => {
         console.log(data);
     }).on("timeout", (data) => {
-        console.log(data);
+        // console.log(data);
     }).on("players", (data) => {
-        console.log(data);
+        // console.log(data);
     }).on("rules", (data) => {
-        console.log(data);
+        // console.log(data);
     }).on("ping", (latency) => {
-        console.log(latency);
+        // console.log(latency);
     }).on("challenge", () => {
         // Query when challenge received
         query.query_players();
         query.query_rules();
+    }).on("error", (err) => {
+        console.log("err");
     });
 
     // Query server info
@@ -31,9 +33,11 @@ query.check_connection().then((latency) => {
 
     // Get challenge
     query.query_challenge();
+
+    query
 }).catch(() => {
     console.log("Failed to connect");
 
-    query.close();
+    query.closeUDP();
 });
 

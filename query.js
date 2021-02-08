@@ -1,9 +1,10 @@
 const dgram = require('dgram')
-    , BufferExt = require('./modules/BufferExt')
+    , net = require('net')
+    , BufferExt = require('./lib/BufferExt')
     , inherits = require('util').inherits
     , EventEmitter = require('events')
-    , Latency = require('./modules/Latency')
-    , {UDP_RESPONSE, UDP_PACKET, TCP_RESPONSE, TCP_PACKET} = require('./modules/constants');
+    , Latency = require('./lib/Latency')
+    , {UDP_RESPONSE, UDP_PACKET, TCP_RESPONSE, TCP_PACKET} = require('./lib/constants');
 
 function Query(address, port = 27015, timeout = 1500, VERBOSE = false){
     // Constructor
@@ -38,24 +39,66 @@ Query.prototype.connect = function(){
     if(this.VERBOSE) console.log("Socket for UDP4 created");
 
     // Start socket
-    this._client = dgram.createSocket('udp4');
+    this._udpClient = dgram.createSocket('udp4');
 
     // Bind event listeners
-    this._client.on("message", (data) => {
-        this._onReceiveData(data);
+    this._udpClient.on("message", (data) => {
+        this._onReceiveDataUDP(data);
     }).on("error", (err) => {
         this.emit("error", err);
     }).on("listening", () => {
         this.emit("listening");
     }).on("close", () => {
-        this.emit("close");
+        this.emit("close", "udp");
     });
 };
+
+Query.prototype.connect_rcon = function(rcon){
+    this._tcpClient = new net.Socket();
+
+    this._tcpClient.connect(this.port, this.address, () => {
+        console.log("connected to server through TCP/IP");
+
+        // Authentication packet
+        let packet = this._create_tcp_packet(TCP_PACKET.SERVERDATA_AUTH, rcon)[0];
+
+        // Authenticate client
+        this._tcpClient.write(packet);
+
+        // Bind handlers
+        this._tcpClient.on("data", (data) => {
+            this._onReceiveDataTCP(data);
+        }).on("close", () => {
+            this.emit("close", "tcp");
+        })
+    });
+};
+
+Query.prototype.send_rcon = function(msg){
+    let packet_ = this._create_tcp_packet(TCP_PACKET.SERVERDATA_EXECCOMMAND, rcon);
+    let packet = packet_[0];
+
+    this._tcpClient.write(packet);
+
+    return packet_[1];
+};
+
+Query.prototype._create_tcp_packet = function(type, text){
+    let packet_size = 4 + 4 + 4 + rcon.length + 1;
+    let packet = new Buffer.allocUnsafe(4 + packet_size);
+    packet.writeUInt32LE(packet_size,0)// sent size of packet
+    let id = 0;
+    packet.writeUInt32LE(id, 4); // Create random ID for packet
+    packet.writeUInt32LE(type, 8);
+    packet.write(text.concat("\0"), 12);
+
+    return [packet, id];
+}
 
 /**
  * UDP Receive response
  */
-Query.prototype._onReceiveData = function(msg){
+Query.prototype._onReceiveDataUDP = function(msg){
     // Receive message
     let data = new BufferExt(msg);
 
@@ -81,6 +124,26 @@ Query.prototype._onReceiveData = function(msg){
             break;
         case UDP_RESPONSE.A2S_SERVERQUERY_GETCHALLENGE:
             this._handle_challenge(data);
+            break;
+    }
+};
+
+/**
+ * TCP Receive data
+ */
+Query.prototype._onReceiveDataTCP = function(data){
+    let data_buffer = Buffer.from(data);
+
+    let size = data_buffer.readLong();
+    let id = data_buffer.readLong();
+    let header = data_buffer.readLong();
+
+    switch(header){
+        case TCP_RESPONSE.SERVERDATA_AUTH_RESPONSE:
+            this._handle_auth_response(id);
+            break;
+        case TCP_RESPONSE.SERVERDATA_RESPONSE_VALUE:
+            this._handle_response_value(data_buffer, id);
             break;
     }
 };
@@ -197,6 +260,17 @@ Query.prototype._handle_ping = function(){
     this.emit("ping", this.latency.difference());
 };
 
+Query.prototype._handle_auth_response = function(data){
+    this.emit("auth", (data != -1));
+};
+
+Query.prototype._handle_response_value = function(data, id){
+    this.emit("message", {
+        id: id, // Response ID from packet
+        data: data.readString()
+    });
+};
+
 /**
  * Query functions
  */
@@ -207,7 +281,7 @@ Query.prototype.query_challenge = function(){
         this.emit("timeout", new Error("Challenge timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.from(UDP_PACKET.A2S_PLAYER_CHALLENGE), this.port, this.address);
+    this._udpClient.send(Buffer.from(UDP_PACKET.A2S_PLAYER_CHALLENGE), this.port, this.address);
 };
 
 Query.prototype.query_server_info = function(){
@@ -217,7 +291,7 @@ Query.prototype.query_server_info = function(){
         this.emit("timeout", new Error("Server info timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.from(UDP_PACKET.A2S_INFO), this.port, this.address);
+    this._udpClient.send(Buffer.from(UDP_PACKET.A2S_INFO), this.port, this.address);
 };
 
 Query.prototype.query_players = function(){
@@ -232,7 +306,7 @@ Query.prototype.query_players = function(){
         this.emit("timeout", new Error("Players timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.concat([Buffer.from(UDP_PACKET.A2S_PLAYER), this.challenge]), this.port, this.address);
+    this._udpClient.send(Buffer.concat([Buffer.from(UDP_PACKET.A2S_PLAYER), this.challenge]), this.port, this.address);
 };
 
 Query.prototype.query_rules = function(){
@@ -247,7 +321,7 @@ Query.prototype.query_rules = function(){
         this.emit("timeout", new Error("Rules timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.concat([Buffer.from(UDP_PACKET.A2S_RULES), this.challenge]), this.port, this.address);
+    this._udpClient.send(Buffer.concat([Buffer.from(UDP_PACKET.A2S_RULES), this.challenge]), this.port, this.address);
 };
 
 Query.prototype.query_ping = function(){
@@ -258,7 +332,7 @@ Query.prototype.query_ping = function(){
     }, this.timeout);
 
     this.latency.start();
-    this._client.send(Buffer.from(UDP_PACKET.A2A_PING), this.port, this.address);
+    this._udpClient.send(Buffer.from(UDP_PACKET.A2A_PING), this.port, this.address);
 };
 
 /**
@@ -283,10 +357,16 @@ Query.prototype.check_connection = async function(){
 /**
  * Close socket connection
  */
-Query.prototype.close = function(){
-    if(this.VERBOSE) console.log("CLOSING CONNECTION");
+Query.prototype.closeUDP = function(){
+    if(this.VERBOSE) console.log("CLOSING CONNECTION - UDP");
 
-    this._client.close();
+    this._udpClient.close();
+};
+
+Query.prototype.closeTCP = function(){
+    if(this.VERBOSE) console.log("CLOSING CONNECTION - TCP");
+
+    this._tcpClient.close();
 };
 
 module.exports = Query;
