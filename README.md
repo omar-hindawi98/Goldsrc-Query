@@ -1,6 +1,8 @@
 # Goldsrc-Query
 A query tool for retrieving information through UDP using the GoldSrc Query Protocol.
 <br >
+Will soon have support for TCP/IP interaction with rcon of server.
+<br >
 **Version:** ES5/ES6
 
 ## Include library

@@ -3,7 +3,7 @@ const dgram = require('dgram')
     , inherits = require('util').inherits
     , EventEmitter = require('events')
     , Latency = require('./modules/Latency')
-    , constants = require('./modules/constants');
+    , {UDP_RESPONSE, UDP_PACKET, TCP_RESPONSE, TCP_PACKET} = require('./modules/constants');
 
 function Query(address, port = 27015, timeout = 1500, VERBOSE = false){
     // Constructor
@@ -66,20 +66,20 @@ Query.prototype._onReceiveData = function(msg){
     let header = data.readByte();
 
     switch(header){
-        case constants.HEADER.A2S_INFO:
+        case UDP_RESPONSE.A2S_INFO:
             this._handle_server_info(data);
             break;
-        case constants.HEADER.A2A_PING:
+        case UDP_RESPONSE.A2A_PING:
             this._handle_ping();
             break;
-        case constants.HEADER.A2S_PLAYER:
+        case UDP_RESPONSE.A2S_PLAYER:
             this._handle_players(data);
             break;
-        case constants.HEADER.A2S_RULES:
+        case UDP_RESPONSE.A2S_RULES:
             // MIGHT BE DEPRECATED
             this._handle_rules(data);
             break;
-        case constants.HEADER.A2S_SERVERQUERY_GETCHALLENGE:
+        case UDP_RESPONSE.A2S_SERVERQUERY_GETCHALLENGE:
             this._handle_challenge(data);
             break;
     }
@@ -207,7 +207,7 @@ Query.prototype.query_challenge = function(){
         this.emit("timeout", new Error("Challenge timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.from(constants.A2S_PLAYER_CHALLENGE), this.port, this.address);
+    this._client.send(Buffer.from(UDP_PACKET.A2S_PLAYER_CHALLENGE), this.port, this.address);
 };
 
 Query.prototype.query_server_info = function(){
@@ -217,7 +217,7 @@ Query.prototype.query_server_info = function(){
         this.emit("timeout", new Error("Server info timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.from(constants.A2S_INFO), this.port, this.address);
+    this._client.send(Buffer.from(UDP_PACKET.A2S_INFO), this.port, this.address);
 };
 
 Query.prototype.query_players = function(){
@@ -232,7 +232,7 @@ Query.prototype.query_players = function(){
         this.emit("timeout", new Error("Players timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.concat([Buffer.from(constants.A2S_PLAYER), this.challenge]), this.port, this.address);
+    this._client.send(Buffer.concat([Buffer.from(UDP_PACKET.A2S_PLAYER), this.challenge]), this.port, this.address);
 };
 
 Query.prototype.query_rules = function(){
@@ -247,7 +247,7 @@ Query.prototype.query_rules = function(){
         this.emit("timeout", new Error("Rules timed out"));
     }, this.timeout);
 
-    this._client.send(Buffer.concat([Buffer.from(constants.A2S_RULES), this.challenge]), this.port, this.address);
+    this._client.send(Buffer.concat([Buffer.from(UDP_PACKET.A2S_RULES), this.challenge]), this.port, this.address);
 };
 
 Query.prototype.query_ping = function(){
@@ -258,7 +258,7 @@ Query.prototype.query_ping = function(){
     }, this.timeout);
 
     this.latency.start();
-    this._client.send(Buffer.from(constants.A2A_PING), this.port, this.address);
+    this._client.send(Buffer.from(UDP_PACKET.A2A_PING), this.port, this.address);
 };
 
 /**
