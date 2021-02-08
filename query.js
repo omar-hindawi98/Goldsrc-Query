@@ -15,6 +15,8 @@ function Query(address, port = 27015, timeout = 1500, VERBOSE = false){
     this.VERBOSE = VERBOSE;
     this.timeout = timeout;
 
+    this.id_sequence = 0;
+
     // Information variables
     this.latency = new Latency();
 
@@ -26,7 +28,6 @@ inherits(Query, EventEmitter);
 /**
  * Set verbose
  */
-
 Query.prototype.set_verbose = function(value){
     this.VERBOSE = value;
 };
@@ -84,15 +85,14 @@ Query.prototype.send_rcon = function(msg){
 };
 
 Query.prototype._create_tcp_packet = function(type, text){
-    let packet_size = 4 + 4 + 4 + rcon.length + 1;
+    let packet_size = 4 + 4 + 4 + text.length + 1;
     let packet = new Buffer.allocUnsafe(4 + packet_size);
     packet.writeUInt32LE(packet_size,0)// sent size of packet
-    let id = 0;
-    packet.writeUInt32LE(id, 4); // Create random ID for packet
+    packet.writeUInt32LE(this.id_sequence, 4); // Create random ID for packet
     packet.writeUInt32LE(type, 8);
     packet.write(text.concat("\0"), 12);
 
-    return [packet, id];
+    return [packet, this.id_sequence++];
 }
 
 /**
@@ -296,7 +296,7 @@ Query.prototype.query_server_info = function(){
 
 Query.prototype.query_players = function(){
     if(this.challenge == null){
-        this.emit("timeout", new Error("Challenge not set"));
+        this.emit("challenge_error", new Error("Challenge not set"));
         return;
     }
 
@@ -311,7 +311,7 @@ Query.prototype.query_players = function(){
 
 Query.prototype.query_rules = function(){
     if(this.challenge == null){
-        this.emit("timeout", new Error("Challenge not set"));
+        this.emit("challenge_error", new Error("Challenge not set"));
         return;
     }
 

@@ -1,7 +1,7 @@
 # Goldsrc-Query
 A query tool for retrieving information through UDP using the GoldSrc Query Protocol.
 <br >
-Will soon have support for TCP/IP interaction with rcon of server.
+The library can also be used to execute command through TCP/IP Rcon protocol.
 <br >
 **Version:** ES5/ES6
 
@@ -54,7 +54,7 @@ query.on("players", (data) => {}); // On players info response
 query.on("rules", (data) => {}); // On rules response
 query.on("ping", (latency) => {}); // On pong
 query.on("timeout", (err) => {}); // If a UDP package times out
-query.on("challenge_unset", (err) => {}); // If challenge is not set
+query.on("challenge_error", (err) => {}); // If challenge is not set
 
 // rcon
 query.on("auth", (status) => {}); // Set to true if authed
