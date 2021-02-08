@@ -1,30 +1,26 @@
-const dgram = require('dgram');
+const dgram = require('dgram')
+    , BufferExt = require('./modules/BufferExt')
+    , inherits = require('util').inherits
+    , EventEmitter = require('events')
+    , Latency = require('./modules/Latency')
+    , constants = require('./modules/constants');
 
-const BufferExt = require('./modules/BufferExt')
-        , utils = require('util')
-        , events = require('events')
-        , Latency = require('./modules/Latency')
-        , constants = require('./modules/constants');
-
-function Query(address, port = 27015, VERBOSE = false){
+function Query(address, port = 27015, timeout = 1500, VERBOSE = false){
     // Constructor
     if(!(this instanceof Query))
         return new Query(address, port, VERBOSE);
     this.address = address;
     this.port = port;
     this.VERBOSE = VERBOSE;
+    this.timeout = timeout;
 
     // Information variables
-    this.challenge = null;
-    this.server_info = null;
-    this.players_info = null;
-    this.rules_info = null;
     this.latency = new Latency();
 
-    events.EventEmitter.call(this);
+    EventEmitter.call(this);
 }
 
-utils.inherits(Query, events.EventEmitter);
+inherits(Query, EventEmitter);
 
 /**
  * Set verbose
@@ -42,22 +38,18 @@ Query.prototype.connect = function(){
     if(this.VERBOSE) console.log("Socket for UDP4 created");
 
     // Start socket
-    this.client = dgram.createSocket('udp4');
+    this._client = dgram.createSocket('udp4');
 
     // Bind event listeners
-    this.client
-        .on("message", (data) => {
-            this._onReceiveData(data);
-        })
-        .on("error", (err) => {
-            this.emit("error", err);
-        })
-        .on("listening", () => {
-            this.emit("listening");
-        })
-        .on("close", () => {
-            this.emit("close");
-        });
+    this._client.on("message", (data) => {
+        this._onReceiveData(data);
+    }).on("error", (err) => {
+        this.emit("error", err);
+    }).on("listening", () => {
+        this.emit("listening");
+    }).on("close", () => {
+        this.emit("close");
+    });
 };
 
 /**
@@ -67,7 +59,7 @@ Query.prototype._onReceiveData = function(msg){
     // Receive message
     let data = new BufferExt(msg);
 
-    // Remove all 4 0xFF
+    // Remove 0xFFFFFFFF header
     data.removeOffset(4);
 
     // Handle message
@@ -94,12 +86,15 @@ Query.prototype._onReceiveData = function(msg){
 };
 
 /**
- * Init message handlers
+ * Message handlers
  */
 Query.prototype._handle_challenge = function(data){
     if(this.VERBOSE) console.log("RESPONSE - CHALLENGE");
 
     this.challenge = data.readLong(true);
+
+    // Clear timeout
+    clearTimeout(this.challenge_timeout);
 
     this.emit("challenge", this.challenge);
 };
@@ -108,14 +103,12 @@ Query.prototype._handle_server_info = function(data){
     if(this.VERBOSE) console.log("RESPONSE - SERVER_INFO");
 
     this.server_info = {
-        latency: null,
         address: data.readString(),
         name: data.readString(),
         map: data.readString(),
         folder: data.readString(),
         game: data.readString(),
         players: data.readByte(),
-        players_info: [],
         max_players: data.readByte(),
         protocol: data.readByte(),
         server_type: data.readByte(true),
@@ -130,16 +123,15 @@ Query.prototype._handle_server_info = function(data){
             type: null,
             dll: null,
         },
-        rules_info: null,
         vac: null,
         bots: null
-    }
+    };
 
     // additional info
     if(this.server_info.mod_info.mod == 1){
         this.server_info.mod_info.link = data.readString();
         this.server_info.mod_info.dl_link = data.readString();
-        data.readByte();
+        data.readByte(); // NULL BYTE
         this.server_info.mod_info.version = data.readLong();
         this.server_info.mod_info.size = data.readLong();
         this.server_info.mod_info.type = data.readByte();
@@ -148,6 +140,8 @@ Query.prototype._handle_server_info = function(data){
 
     this.server_info.vac = data.readByte();
     this.server_info.bots = data.readByte();
+
+    clearTimeout(this.info_timeout);
 
     this.emit("info", this.server_info);
 }
@@ -167,6 +161,8 @@ Query.prototype._handle_players = function(data){
         });
     }
 
+    clearTimeout(this.players_timeout);
+
     this.emit("players", this.players_info);
 };
 
@@ -185,6 +181,8 @@ Query.prototype._handle_rules = function(data){
         });
     }
 
+    clearTimeout(this.rules_timeout);
+
     this.emit("rules", this.rules_info);
 };
 
@@ -193,8 +191,10 @@ Query.prototype._handle_ping = function(){
 
     this.latency.stop();
 
+    clearTimeout(this.ping_timeout);
+
     // Emit new event
-    this.emit("ping", this.latency);
+    this.emit("ping", this.latency.difference());
 };
 
 /**
@@ -203,43 +203,82 @@ Query.prototype._handle_ping = function(){
 Query.prototype.query_challenge = function(){
     if(this.VERBOSE) console.log("QUERY - CHALLENGE");
 
-    this.client.send(Buffer.from(constants.A2S_PLAYER_CHALLENGE), this.port, this.address);
+    this.challenge_timeout = setTimeout(() => {
+        this.emit("timeout", new Error("Challenge timed out"));
+    }, this.timeout);
+
+    this._client.send(Buffer.from(constants.A2S_PLAYER_CHALLENGE), this.port, this.address);
 };
 
 Query.prototype.query_server_info = function(){
     if(this.VERBOSE) console.log("QUERY - SERVER_INFO");
 
-    this.client.send(Buffer.from(constants.A2S_INFO), this.port, this.address);
+    this.info_timeout = setTimeout(() => {
+        this.emit("timeout", new Error("Server info timed out"));
+    }, this.timeout);
+
+    this._client.send(Buffer.from(constants.A2S_INFO), this.port, this.address);
 };
 
 Query.prototype.query_players = function(){
     if(this.challenge == null){
-        this.emit("error", new Error("Challenge not set"));
+        this.emit("timeout", new Error("Challenge not set"));
         return;
     }
 
     if(this.VERBOSE) console.log("QUERY - PLAYERS");
 
-    this.client.send(Buffer.concat([Buffer.from(constants.A2S_PLAYER), this.challenge]), this.port, this.address);
+    this.players_timeout = setTimeout(() => {
+        this.emit("timeout", new Error("Players timed out"));
+    }, this.timeout);
+
+    this._client.send(Buffer.concat([Buffer.from(constants.A2S_PLAYER), this.challenge]), this.port, this.address);
 };
 
 Query.prototype.query_rules = function(){
     if(this.challenge == null){
-        this.emit("error", new Error("Challenge not set"));
+        this.emit("timeout", new Error("Challenge not set"));
         return;
     }
 
     if(this.VERBOSE) console.log("QUERY - RULES");
 
-    this.client.send(Buffer.concat([Buffer.from(constants.A2S_RULES), this.challenge]), this.port, this.address);
+    this.rules_timeout = setTimeout(() => {
+        this.emit("timeout", new Error("Rules timed out"));
+    }, this.timeout);
+
+    this._client.send(Buffer.concat([Buffer.from(constants.A2S_RULES), this.challenge]), this.port, this.address);
 };
 
 Query.prototype.query_ping = function(){
     if(this.VERBOSE) console.log("QUERY - PING");
 
+    this.ping_timeout = setTimeout(() => {
+        this.emit("timeout", new Error("Ping timed out"));
+    }, this.timeout);
+
     this.latency.start();
-    this.client.send(Buffer.from(constants.A2A_PING), this.port, this.address);
+    this._client.send(Buffer.from(constants.A2A_PING), this.port, this.address);
 };
+
+/**
+ * Check connection
+ */
+
+Query.prototype.check_connection = async function(){
+    this.query_ping();
+
+    let self = this;
+    let promise = await new Promise((resolve, reject) => {
+        self.on("ping", () => {
+            return resolve();
+        }).on("timeout", (err) => {
+            return reject("Failed to connect");
+        });
+    });
+
+    return promise;
+}
 
 /**
  * Close socket connection
@@ -247,7 +286,7 @@ Query.prototype.query_ping = function(){
 Query.prototype.close = function(){
     if(this.VERBOSE) console.log("CLOSING CONNECTION");
 
-    this.client.close();
+    this._client.close();
 };
 
 module.exports = Query;

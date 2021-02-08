@@ -1,5 +1,7 @@
 # Goldsrc-Query
 A query tool for retrieving information through UDP using the GoldSrc Query Protocol.
+<br >
+**Version:** ES5/ES6
 
 ## Include library
 Include the library by adding following snippet to your code
@@ -41,7 +43,8 @@ query.on("info", (data) => {});
 query.on("players", (data) => {});
 query.on("rules", (data) => {});
 query.on("ping", (latency) => {});
-query.on("error", (err) => {}); // If challenge is not set
+query.on("timeout", (err) => {}); // If a UDP package times out
+query.on("challenge_unset", (err) => {}); // If challenge is not set
 ```
 
 ## Examples

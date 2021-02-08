@@ -1,22 +1,36 @@
 const Query = require('./../query')
 
+const query = new Query("91.225.104.199", 27015);
 
-const query = new Query("213.238.173.79");
-
-query.set_verbose(true);
-
+// Connect
 query.connect();
 
-// Create handlers
-query.on("server_info", (data) => {
-    console.log(data);
+let online =  query.check_connection().then(() => {
+    // Create handlers
+    query.on("info", (data) => {
+        console.log(data);
+    }).on("timeout", (data) => {
+        console.log(data);
+    }).on("players", (data) => {
+        console.log(data);
+    }).on("rules", (data) => {
+        console.log(data);
+    }).on("ping", (latency) => {
+        console.log(latency);
+    }).on("challenge", () => {
+        // Query when challenge received
+        query.query_players();
+        query.query_rules();
+    });
+
+    // Query server info
+    query.query_server_info();
+
+    // Get challenge
+    query.query_challenge();
+}).catch(() => {
+    console.log("Failed to connect");
+
+    query.close();
 });
 
-query.on("challenge", (data) => {
-
-});
-
-// Get server info
-query.query_server_info();
-
-query.query_challenge();

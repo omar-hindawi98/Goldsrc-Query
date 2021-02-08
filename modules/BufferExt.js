@@ -27,20 +27,13 @@ BufferExt.prototype.readString =  function(){
     return Buffer.from(string_array).toString();
 };
 
-BufferExt.prototype.readShort =  function(){
-    let data = this.buffer.slice(0, 2);
-
-    this.buffer = this.buffer.slice(3);
-
-    return (raw) ? data : data.readInt16LE(); // fix this shit
-};
 
 BufferExt.prototype.readShort =  function(raw = false){
     let data = this.buffer.slice(0, 2);
 
     this.buffer = this.buffer.slice(3);
 
-    return (raw) ? data : data.readInt16LE(); // fix this shit
+    return (raw) ? data : data.readInt16LE();
 };
 
 BufferExt.prototype.readLong =  function(raw = false){

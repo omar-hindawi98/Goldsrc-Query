@@ -1,4 +1,4 @@
-const OFFSET_BYTES = [0xFFFFFFFF];
+const OFFSET_BYTES = [0xFF, 0xFF, 0xFF, 0xFF];
 
 /**
  * Queries information about the server
