@@ -5,7 +5,9 @@ const query = new Query("91.225.104.199", 27015);
 // Connect
 query.connect();
 
-let online =  query.check_connection().then(() => {
+let online =  query.check_connection().then((latency) => {
+    console.log("Latency: " + latency);
+
     // Create handlers
     query.on("info", (data) => {
         console.log(data);

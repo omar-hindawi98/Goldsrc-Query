@@ -31,7 +31,7 @@ BufferExt.prototype.readString =  function(){
 BufferExt.prototype.readShort =  function(raw = false){
     let data = this.buffer.slice(0, 2);
 
-    this.buffer = this.buffer.slice(3);
+    this.buffer = this.buffer.slice(2);
 
     return (raw) ? data : data.readInt16LE();
 };
@@ -39,7 +39,7 @@ BufferExt.prototype.readShort =  function(raw = false){
 BufferExt.prototype.readLong =  function(raw = false){
     let data = this.buffer.slice(0, 4);
 
-    this.buffer = this.buffer.slice(5);
+    this.buffer = this.buffer.slice(4);
 
     return (raw) ? data : data.readInt32LE(); // fix this shit
 };
@@ -47,9 +47,9 @@ BufferExt.prototype.readLong =  function(raw = false){
 BufferExt.prototype.readFloat =  function(raw = false){
     let data = this.buffer.slice(0, 4);
 
-    this.buffer = this.buffer.slice(5);
+    this.buffer = this.buffer.slice(4);
 
-    return (raw) ? data : data.readFloat; // fix this shit
+    return (raw) ? data : data.readFloatLE(); // fix this shit
 };
 
 BufferExt.prototype.removeOffset =  function(offset){

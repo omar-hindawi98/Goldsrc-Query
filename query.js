@@ -270,8 +270,8 @@ Query.prototype.check_connection = async function(){
 
     let self = this;
     let promise = await new Promise((resolve, reject) => {
-        self.on("ping", () => {
-            return resolve();
+        self.on("ping", (latency) => {
+            return resolve(latency);
         }).on("timeout", (err) => {
             return reject("Failed to connect");
         });

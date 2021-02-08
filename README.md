@@ -18,6 +18,10 @@ const query = new Query(address, port, VERBOSE);
 query.connect(); // Starts the socket
 query.close(); // Closes the socket
 
+query.check_connection() // Returns a promise with latency
+        .then( (latency) => {})
+        .catch(() => {}); 
+
 // Change Verbose
 query.set_verbose(value);
 
@@ -38,11 +42,11 @@ query.on("listening", () => {});
 query.on("close", () => {});
 
 // Response
-query.on("challenge", (challenge) => {});
-query.on("info", (data) => {});
-query.on("players", (data) => {});
-query.on("rules", (data) => {});
-query.on("ping", (latency) => {});
+query.on("challenge", (challenge) => {}); // On challenge response
+query.on("info", (data) => {}); // On Server info response
+query.on("players", (data) => {}); // On players info response
+query.on("rules", (data) => {}); // On rules response
+query.on("ping", (latency) => {}); // On pong
 query.on("timeout", (err) => {}); // If a UDP package times out
 query.on("challenge_unset", (err) => {}); // If challenge is not set
 ```
