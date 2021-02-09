@@ -71,7 +71,9 @@ Query.prototype.connect_rcon = function(rcon){
             this._onReceiveDataTCP(data);
         }).on("close", () => {
             this.emit("close", "tcp");
-        })
+        }).on("error", (err) => {
+            console.log("failed to connect");
+        });
     });
 };
 
@@ -112,6 +114,9 @@ Query.prototype._onReceiveDataUDP = function(msg){
         case UDP_RESPONSE.A2S_INFO:
             this._handle_server_info(data);
             break;
+        case UDP_RESPONSE.A2S_INFO_ADDITIONAL:
+            this._handle_server_info_additional(data);
+            break;
         case UDP_RESPONSE.A2A_PING:
             this._handle_ping();
             break;
@@ -119,7 +124,6 @@ Query.prototype._onReceiveDataUDP = function(msg){
             this._handle_players(data);
             break;
         case UDP_RESPONSE.A2S_RULES:
-            // MIGHT BE DEPRECATED
             this._handle_rules(data);
             break;
         case UDP_RESPONSE.A2S_SERVERQUERY_GETCHALLENGE:
@@ -207,7 +211,49 @@ Query.prototype._handle_server_info = function(data){
     clearTimeout(this.info_timeout);
 
     this.emit("info", this.server_info);
-}
+};
+
+Query.prototype._handle_server_info_additional = function(data){
+    if(this.VERBOSE) console.log("RESPONSE - SERVER_INFO");
+
+    this.server_info = {
+        protocol: data.readByte(),
+        name: data.readString(),
+        map: data.readString(),
+        folder: data.readString(),
+        game: data.readString(),
+        game_id: data.readShort(),
+        players: data.readByte(),
+        max_players: data.readByte(),
+        bots: data.readByte(),
+        server_type: data.readByte(true),
+        env: data.readByte(true),
+        visibility: data.readByte(),
+        vac: data.readByte(),
+        version: data.readString(),
+        server_port: null,
+        steamid: null,
+        spec_port: null,
+        spec_name: null,
+        keywords: null,
+        game_id_64: null
+    };
+
+    let EDF = data.readByte();
+
+    if(EDF & 0x80) this.server_info.server_port = data.readShort();
+    if(EDF & 0x10) this.server_info.steamid = data.readLong();
+    if(EDF & 0x40){
+        this.server_info.spec_port = data.readShort();
+        this.server_info.spec_name = data.readString();
+    }
+    if(EDF & 0x20) this.server_info.keywords = data.readString();
+    if(EDF & 0x01) this.server_info.game_id_64 = data.readLong();
+
+    clearTimeout(this.info_timeout);
+
+    this.emit("info", this.server_info);
+};
 
 Query.prototype._handle_players = function(data){
     if(this.VERBOSE) console.log("RESPONSE - PLAYERS");
@@ -237,7 +283,7 @@ Query.prototype._handle_rules = function(data){
         list: []
     };
 
-    for(let i = 0; i < total_rules; i++){
+    for(let i = 0; i < this.rules_info.total; i++){
         this.rules_info.list.push({
             name: data.readString(),
             value: data.readString()
